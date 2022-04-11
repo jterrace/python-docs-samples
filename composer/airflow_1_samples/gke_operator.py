@@ -48,29 +48,45 @@ with models.DAG(
     # [END composer_gkeoperator_templateconfig_airflow_1]
     # [END composer_gkeoperator_affinity_airflow_1]
     # [END composer_gkeoperator_fullconfig_airflow_1]
-    CLUSTER = {"name": CLUSTER_NAME, "initial_node_count": 1}
     # [END composer_gke_create_cluster_airflow_1]
     # [START composer_gke_create_cluster_airflow_1]
-    create_cluster = GKECreateClusterOperator(
-        task_id="create_cluster",
-        project_id=PROJECT_ID,
-        location=CLUSTER_REGION,
-        body=CLUSTER,
+
+    # It is recommended to use regional clusters for increased reliability
+    # though passing a zone in the location parameter is also valid
+    # Due to the way location is passed in Airflow 1.10.15,
+    # You must use the BashOperator to create a regional cluster
+    # In Airflow 2, or in Airflow 1 with zonal clusters,
+    # you can use the CreateClusterOperator
+    create_cluster = BashOperator(
+    task_id="create_cluster",
+    bash_command=f"gcloud container clusters create {CLUSTER_NAME} \
+                    --region {CLUSTER_REGION} \
+                    --num-nodes 1",
+
     )
+    # TODO(developer): use this instead of the BashOperator 
+    # in Airflow 2 or with zonal clusters
+    #CLUSTER = {"name": CLUSTER_NAME, "initial_node_count": 1}
+    # create_cluster = GKECreateClusterOperator(
+    #     task_id="create_cluster",
+    #     project_id=PROJECT_ID,
+    #     location=CLUSTER_ZONE,
+    #     body=CLUSTER,
+    # )
+
     # Using the BashOperator to create node pools is a workaround
     # In Airflow 2, because of https://github.com/apache/airflow/pull/17820
     # Node pool creation can be done using the GKECreateClusterOperator
-
     create_node_pools = BashOperator(
         task_id="create_node_pools",
         bash_command=f"gcloud container node-pools create pool-0 \
                         --cluster {CLUSTER_NAME} \
                         --num-nodes 1 \
-                        --zone {CLUSTER_REGION} \
+                        --region {CLUSTER_REGION} \
                         && gcloud container node-pools create pool-1 \
                         --cluster {CLUSTER_NAME} \
                         --num-nodes 1 \
-                        --zone {CLUSTER_REGION}",
+                        --region {CLUSTER_REGION}",
     )
     # [END composer_gke_create_cluster_airflow_1]
 
